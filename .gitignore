@@ -1,0 +1,13 @@
+.DS_Store
+.runtime/
+.cache/
+dist/
+build/
+__pycache__/
+*.pyc
+.venv/
+*.bin
+*.dmg
+*.app/
+*.log
+

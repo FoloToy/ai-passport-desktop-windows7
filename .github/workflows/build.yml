@@ -1,0 +1,21 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package (go-legacy-win7, x64 and x86)
+        run: ALLOW_DIRTY=1 scripts/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows7
+          path: |
+            dist/*.zip
+            dist/*.sha256
