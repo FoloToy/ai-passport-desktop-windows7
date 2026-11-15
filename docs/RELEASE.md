@@ -38,7 +38,20 @@ gh release create vX.Y.Z --target <完整的 commit SHA> --prerelease \
 - 没有在 Windows 7 真机上验收前，一律 `--prerelease`。
 - 发布说明用中文：一句话概括 → 下载对照表（64 位 / 32 位）→ 新增 / 修复 → 测试情况（如实写在哪些系统上跑过、哪些没有，有没有代码签名）。
 
-## 4. 清理旧版本
+## 4. 上传到火山引擎 TOS（下载页）
+
+官网下载页 https://ai-passport.folotoy.cn/tools/desktop-app/ 的数据由桌面版仓库的 `scripts/publish-tos.py` 发布（说明见那边的 `docs/RELEASE.md`）。在桌面版仓库里运行：
+
+```sh
+scripts/publish-tos.py --product windows7 --version X.Y.Z --date YYYY-MM-DD \
+  --commit <本仓库完整的 commit SHA> --prerelease \
+  --summary-zh "一句话中文概括" --summary-en "One-sentence English summary" \
+  --dry-run ../ai-passport-desktop-windows7/dist/*.zip
+```
+
+检查无误后去掉 `--dry-run`。每个版本只能发布一次，旧版本一直保留在 `tools/ai-passport-desktop/windows7/vX.Y.Z/`。
+
+## 5. 清理旧版本
 
 ```sh
 gh release delete vOLD --cleanup-tag --yes && git tag -d vOLD
