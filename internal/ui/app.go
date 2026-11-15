@@ -51,6 +51,19 @@ type app struct {
 	// flashDlg is non-nil while the install dialog is open.
 	flashDlg *flashDialog
 	done     chan struct{}
+
+	// driverMissing is true while a plugged-in AI Passport has no serial driver
+	// (Windows 7/8). driverAsked keeps the install prompt to once per run.
+	driverMissing bool
+	driverAsked   bool
+}
+
+// form is the window message boxes belong to: the install dialog when it is open.
+func (a *app) form() walk.Form {
+	if a.flashDlg != nil && a.flashDlg.dlg != nil {
+		return a.flashDlg.dlg
+	}
+	return a.mw
 }
 
 // Run shows the main window and returns when it is closed.

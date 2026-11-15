@@ -23,14 +23,15 @@ type flashDialog struct {
 	play *library.Play
 	dlg  *walk.Dialog
 
-	ports    *walk.ComboBox
-	portHint *walk.TextLabel
-	start    *walk.PushButton
-	closeBtn *walk.PushButton
-	bar      *walk.ProgressBar
-	stage    *walk.Label
-	result   *walk.TextLabel
-	logView  *walk.TextEdit
+	ports     *walk.ComboBox
+	portHint  *walk.TextLabel
+	driverBtn *walk.PushButton
+	start     *walk.PushButton
+	closeBtn  *walk.PushButton
+	bar       *walk.ProgressBar
+	stage     *walk.Label
+	result    *walk.TextLabel
+	logView   *walk.TextEdit
 
 	list     []device.Port
 	scanning atomic.Bool
@@ -61,6 +62,13 @@ func runFlashDialog(a *app, pl *library.Play) {
 				},
 			},
 			TextLabel{AssignTo: &d.portHint, TextColor: red, MinSize: Size{Width: 400}},
+			Composite{
+				Layout: HBox{MarginsZero: true},
+				Children: []Widget{
+					PushButton{AssignTo: &d.driverBtn, Text: t("driver_install"), Visible: false, OnClicked: func() { d.a.tools.installDriver() }},
+					HSpacer{},
+				},
+			},
 			TextLabel{Text: sentences(t("flash_hint"), t("flash_warn")), TextColor: grey, MinSize: Size{Width: 400}},
 			ProgressBar{AssignTo: &d.bar, MaxValue: 100},
 			Label{AssignTo: &d.stage, Font: uiFont(10, true)},
@@ -142,6 +150,8 @@ func (d *flashDialog) setPorts(ports []device.Port) {
 		}
 	}
 	switch {
+	case recommended == 0 && d.a.driverMissing:
+		setText(d.portHint, t("driver_missing_short"))
 	case len(ports) == 0:
 		setText(d.portHint, t("no_ports"))
 	case recommended == 0:
@@ -204,6 +214,8 @@ func (d *flashDialog) refresh() {
 	setEnabled(d.start, !active)
 	setEnabled(d.ports, !active)
 	setEnabled(d.closeBtn, !active)
+	setVisible(d.driverBtn, d.a.driverMissing)
+	setEnabled(d.driverBtn, !active && !d.a.tools.driverBusy)
 	if !active {
 		d.scan(false)
 	}
@@ -215,6 +227,9 @@ func (d *flashDialog) refresh() {
 	}
 	setProgress(d.bar, st.Percent)
 	stage, result := flashStageText(st)
+	if st.Stage == "failed" && d.a.driverMissing {
+		result += "\r\n" + t("driver_missing_short")
+	}
 	setText(d.stage, stage)
 	setText(d.result, result)
 	if st.Stage == "failed" {

@@ -189,18 +189,36 @@ func (p *toolsPage) installDriver() {
 			p.driverBusy = false
 			p.driverNext = time.Time{}
 			if err != nil {
-				walk.MsgBox(p.a.mw, t("driver_title"), t("err_driver")+"\r\n\r\n"+err.Error(), walk.MsgBoxIconError)
+				walk.MsgBox(p.a.form(), t("driver_title"), t("err_driver")+"\r\n\r\n"+err.Error(), walk.MsgBoxIconError)
 				return
 			}
-			walk.MsgBox(p.a.mw, t("driver_title"), t("driver_done"), walk.MsgBoxIconInformation)
+			walk.MsgBox(p.a.form(), t("driver_title"), t("driver_done"), walk.MsgBoxIconInformation)
 		})
 	}()
+}
+
+// askInstall offers to install the driver as soon as an AI Passport without one
+// is plugged in, whichever page is open. It asks once per run; the button on the
+// tools page and in the install dialog stays available.
+func (p *toolsPage) askInstall() {
+	if p.driverBusy || !p.a.driverMissing {
+		return
+	}
+	if walk.MsgBox(p.a.form(), t("driver_title"), t("driver_ask"), walk.MsgBoxYesNo|walk.MsgBoxIconQuestion) == walk.DlgCmdYes {
+		p.installDriver()
+	}
 }
 
 // checkDriver looks for an AI Passport without a driver every few seconds.
 func (p *toolsPage) checkDriver() {
 	select {
 	case status := <-p.driverDone:
+		p.a.driverMissing = status == driver.Missing
+		if p.a.driverMissing && !p.a.driverAsked && !p.driverBusy {
+			p.a.driverAsked = true
+			// After this refresh, so the prompt's message loop does not run inside it.
+			p.a.mw.Synchronize(p.askInstall)
+		}
 		if !p.driverBusy {
 			if status == driver.Missing {
 				setText(p.driverText, t("driver_missing"))
@@ -250,6 +268,9 @@ func (p *toolsPage) refresh() {
 		return
 	}
 	stage, sub, hint := toolStageText(st)
+	if p.a.driverMissing && (st.Stage == "waiting" || st.Stage == "failed") {
+		hint = t("driver_missing_short")
+	}
 	setText(p.stage, stage)
 	setText(p.sub, sub)
 	setText(p.hint, hint)

@@ -19,7 +19,7 @@ Windows 10/11 和 macOS 请用 [ai-passport-desktop](https://github.com/FoloToy/
 
 1. 把 ZIP 完整解压（不要在压缩包里直接运行），双击 `AIPassportPlays.exe`。不需要装浏览器、.NET 或其他运行库。
 2. 第一次打开时选择玩法存储目录，点"开始更新"。
-3. 插上 AI Passport。Windows 7/8 第一次要装串口驱动（见下一节）。
+3. 插上 AI Passport。Windows 7/8 第一次要装串口驱动：驱动已经在程序里，程序发现设备缺驱动时会主动询问是否安装（见下一节）。
 4. "玩法社区"页选择玩法 →"刷入设备"→ 选择设备 →"开始刷入"。
 
 和旧的 Chrome 版 Windows 7 程序、以及桌面版用同一个设置目录（`%APPDATA%\FoloToy\AI Passport Plays`），已经下载的玩法库可以直接继续用。同一时间只能运行其中一个程序。
@@ -35,7 +35,9 @@ AI Passport 的 USB 口对电脑来说是一个设备、两个接口：
 
 ### 在程序里安装（推荐）
 
-"设备工具"页 →"USB 串口驱动"→"安装驱动"→ UAC 窗口点"是"→ 如果提示"Windows 无法验证此驱动程序软件的发布者"，选"始终安装此驱动程序软件"→ 装好后重新插拔设备。
+插上缺驱动的 AI Passport 后，程序会弹窗询问"现在安装吗？"（每次运行问一次，在哪个页面都会弹）；点"是"即开始安装。也可以随时在"设备工具"页 →"USB 串口驱动"→ 点"安装驱动"。刷机对话框和备份、恢复出厂找不到设备时，如果是缺驱动，也会直接说明并给出"安装驱动"按钮。
+
+安装过程：UAC 窗口点"是"→ 如果提示"Windows 无法验证此驱动程序软件的发布者"，选"始终安装此驱动程序软件"→ 装好后重新插拔设备。
 
 程序用的是 `drivers/ai-passport-usb-serial.inf`（源文件在 `internal/driver/`）：只给串口接口 `MI_00` 绑定 Windows 自带的 `usbser.sys`，用 `pnputil -i -a` 安装，不碰 JTAG 接口。INF 没有签名目录（.cat），所以 Windows 会提示一次发布者无法验证；`usbser.sys` 本身是微软签名的，64 位系统也能装。
 
