@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/FoloToy/ai-passport-desktop/pkg/core"
 	"github.com/FoloToy/ai-passport-desktop/pkg/device"
 	"github.com/FoloToy/ai-passport-desktop/pkg/flasher"
 	"github.com/FoloToy/ai-passport-desktop/pkg/library"
@@ -17,11 +18,23 @@ import (
 	"github.com/FoloToy/ai-passport-desktop-windows7/internal/i18n"
 )
 
-// flashDialog installs one play on a device the user picks.
+// flashTarget is what the install dialog writes: a play, a local firmware file
+// or a full-flash backup going back to its own device.
+type flashTarget struct {
+	play  *library.Play // nil for a file or a backup
+	title string
+	note  string // shown above the port list (installer or backup warning)
+	agree string // the "I understand" checkbox text
+	start func(port string) error
+}
+
+// flashDialog installs one target on a device the user picks.
 type flashDialog struct {
-	a    *app
-	play *library.Play
-	dlg  *walk.Dialog
+	a        *app
+	tg       flashTarget
+	dlg      *walk.Dialog
+	agree    *walk.CheckBox
+	recorded bool
 
 	ports     *walk.ComboBox
 	portHint  *walk.TextLabel
@@ -41,17 +54,27 @@ type flashDialog struct {
 }
 
 func runFlashDialog(a *app, pl *library.Play) {
-	d := &flashDialog{a: a, play: pl}
+	tg := flashTarget{play: pl, title: i18n.Text(pl.Title), agree: t("flash_agree"),
+		start: func(port string) error { return a.c.StartFlash(pl.Slug, port) }}
+	if pl.Slug == core.InstallerSlug {
+		tg.note = t("installer_warn")
+	}
+	openFlash(a, tg)
+}
+
+func openFlash(a *app, tg flashTarget) {
+	d := &flashDialog{a: a, tg: tg}
 	err := Dialog{
 		AssignTo:      &d.dlg,
-		Title:         t("flash_title") + " - " + i18n.Text(pl.Title),
+		Title:         t("flash_title") + " - " + tg.title,
 		MinSize:       Size{Width: 560, Height: 460},
 		Font:          uiFont(9, false),
 		Layout:        VBox{},
 		DefaultButton: &d.start,
 		CancelButton:  &d.closeBtn,
 		Children: []Widget{
-			Label{Text: plain(i18n.Text(pl.Title)), Font: uiFont(12, true)},
+			Label{Text: plain(tg.title), Font: uiFont(12, true)},
+			TextLabel{Text: tg.note, TextColor: red, Visible: tg.note != "", MinSize: Size{Width: 400}},
 			TextLabel{Text: t("step_connect"), MinSize: Size{Width: 400}},
 			Composite{
 				Layout: HBox{MarginsZero: true},
@@ -69,6 +92,7 @@ func runFlashDialog(a *app, pl *library.Play) {
 					HSpacer{},
 				},
 			},
+			CheckBox{AssignTo: &d.agree, Text: tg.agree, Alignment: AlignHNearVCenter, OnCheckedChanged: func() { d.refresh() }},
 			TextLabel{Text: sentences(t("flash_hint"), t("flash_warn")), TextColor: grey, MinSize: Size{Width: 400}},
 			ProgressBar{AssignTo: &d.bar, MaxValue: 100},
 			Label{AssignTo: &d.stage, Font: uiFont(10, true)},
@@ -198,11 +222,15 @@ func (d *flashDialog) begin() {
 		setText(d.portHint, t("choose_port"))
 		return
 	}
-	if err := d.a.c.StartFlash(d.play.Slug, d.list[i].Path); err != nil {
+	if !d.agree.Checked() {
+		return
+	}
+	if err := d.tg.start(d.list[i].Path); err != nil {
 		d.a.showError(err)
 		return
 	}
 	d.started = true
+	d.recorded = false
 	d.logs = 0
 	setText(d.logView, "")
 	d.refresh()
@@ -211,7 +239,8 @@ func (d *flashDialog) begin() {
 func (d *flashDialog) refresh() {
 	st := d.a.c.Flash.Snapshot()
 	active := st.Active
-	setEnabled(d.start, !active)
+	setEnabled(d.start, !active && d.agree.Checked())
+	setEnabled(d.agree, !active)
 	setEnabled(d.ports, !active)
 	setEnabled(d.closeBtn, !active)
 	setVisible(d.driverBtn, d.a.driverMissing)
@@ -239,6 +268,13 @@ func (d *flashDialog) refresh() {
 	}
 	if st.Stage == "done" || st.Stage == "failed" {
 		setText(d.start, t("retry"))
+	}
+	if st.Stage == "done" && !d.recorded {
+		d.recorded = true
+		d.a.rememberDevice(st)
+		if d.tg.play != nil {
+			d.a.recordInstall(d.tg.play)
+		}
 	}
 	if len(st.Logs) != d.logs {
 		d.logs = len(st.Logs)

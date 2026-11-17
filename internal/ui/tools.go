@@ -19,15 +19,25 @@ import (
 // waitMax is how long a restore or backup waits for the device (pkg/device default).
 const waitMax = 150
 
-// toolsPage holds firmware backup, factory restore and the USB driver installer.
+// toolsPage is 工具, laid out like the Android app minus NFC: the default play,
+// installing with a USB cable (local firmware, backup, my backups, factory
+// restore), the Play Installer, and the Bluetooth items, which are shown as
+// unavailable. The status of a backup or restore is on the right.
 type toolsPage struct {
-	a *app
+	a   *app
+	tab int
 
 	backupBtn  *walk.PushButton
 	restoreBtn *walk.PushButton
 	stopBtn    *walk.PushButton
 	fullBackup *walk.CheckBox
 	backupDir  *walk.LineEdit
+	localBtn   *walk.PushButton
+	backupsBtn *walk.PushButton
+	backBtn    *walk.PushButton
+	instBtn    *walk.PushButton
+	instStatus *walk.TextLabel
+	instWanted bool
 
 	stage   *walk.Label
 	sub     *walk.TextLabel
@@ -45,100 +55,126 @@ type toolsPage struct {
 	driverDone chan string
 }
 
+// toolRow is one entry of a section: a button with its explanation, or a
+// greyed-out entry marked "needs Bluetooth".
+func toolRow(assign **walk.PushButton, title, sub string, onClick walk.EventHandler) Widget {
+	ble := onClick == nil
+	if ble {
+		title += "（" + t("needs_ble") + "）"
+	}
+	return Composite{Layout: HBox{MarginsZero: true, Alignment: AlignHNearVCenter}, Children: []Widget{
+		PushButton{AssignTo: assign, Text: title, MinSize: Size{Width: 210}, MaxSize: Size{Width: 210}, Enabled: !ble, OnClicked: onClick},
+		TextLabel{Text: sub, TextColor: grey, MinSize: Size{Width: 220}, StretchFactor: 1},
+	}}
+}
+
 func (p *toolsPage) page() TabPage {
 	wrap := Size{Width: 300}
+	var noBtn *walk.PushButton
 	return TabPage{
-		Title:  t("nav_restore"),
-		Layout: VBox{Alignment: AlignHNearVNear},
+		Title:  t("nav_tools"),
+		Layout: HBox{Alignment: AlignHNearVNear},
 		Children: []Widget{
-			Label{Text: t("tools_lead")},
-			Composite{
-				Layout: HBox{MarginsZero: true, Alignment: AlignHNearVNear},
+			ScrollView{
+				StretchFactor:   3,
+				HorizontalFixed: true,
+				Layout:          VBox{MarginsZero: true},
 				Children: []Widget{
-					Composite{
-						StretchFactor: 1,
-						Layout:        VBox{MarginsZero: true},
+					TextLabel{Text: t("tools_lead"), MinSize: wrap},
+					GroupBox{
+						Title:  t("sec_default") + "（" + t("pill_default") + "）",
+						Layout: VBox{},
 						Children: []Widget{
-							GroupBox{
-								Title:  t("backup_title"),
-								Layout: VBox{},
-								Children: []Widget{
-									TextLabel{Text: t("backup_lead"), MinSize: wrap},
-									Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
-										PushButton{AssignTo: &p.backupBtn, Text: t("backup_start"), OnClicked: p.backup},
-										HSpacer{},
-									}},
-								},
-							},
-							GroupBox{
-								Title:  t("restore_title"),
-								Layout: VBox{},
-								Children: []Widget{
-									TextLabel{Text: t("restore_lead"), MinSize: wrap},
-									TextLabel{Text: "1. " + t("restore_step1") + "\r\n2. " + t("restore_step2"), MinSize: wrap},
-									CheckBox{AssignTo: &p.fullBackup, Text: t("r_full"), Checked: true, Alignment: AlignHNearVCenter},
-									TextLabel{Text: t("r_safety"), TextColor: grey, MinSize: wrap},
-									Label{Text: t("r_fw") + "：" + factory.Version, TextColor: grey},
-									Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
-										PushButton{AssignTo: &p.restoreBtn, Text: t("restore_start"), OnClicked: p.restore},
-										PushButton{AssignTo: &p.stopBtn, Text: t("restore_stop"), Enabled: false, OnClicked: func() {
-											p.a.showError(p.a.c.CancelRestore())
-										}},
-										HSpacer{},
-									}},
-								},
-							},
-							GroupBox{
-								Title:  t("r_backup_dir"),
-								Layout: HBox{},
-								Children: []Widget{
-									LineEdit{AssignTo: &p.backupDir, ReadOnly: true},
-									PushButton{Text: t("change"), OnClicked: p.chooseBackupDir},
-									PushButton{Text: t("open_backup"), OnClicked: func() { reveal(p.a.c.Settings.Get().Backups()) }},
-								},
-							},
-							GroupBox{
-								Title:  t("driver_title"),
-								Layout: VBox{},
-								Children: []Widget{
-									TextLabel{AssignTo: &p.driverText, MinSize: wrap},
-									Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
-										PushButton{AssignTo: &p.driverBtn, Text: t("driver_install"), OnClicked: p.installDriver},
-										HSpacer{},
-									}},
-								},
-							},
-							VSpacer{},
+							TextLabel{Text: t("sec_default_info"), MinSize: wrap},
+							toolRow(&noBtn, t("t_edit_passport"), t("t_edit_passport_sub"), nil),
+							toolRow(&p.backBtn, t("t_passport_back"), t("t_passport_back_sub"), func() { p.restore() }),
 						},
 					},
-					Composite{
-						StretchFactor: 1,
-						Layout:        VBox{MarginsZero: true},
-						Children: []Widget{GroupBox{
-							Title:  t("status"),
-							Layout: VBox{},
-							Children: []Widget{
-								Label{AssignTo: &p.stage, Font: uiFont(12, true)},
-								TextLabel{AssignTo: &p.sub, MinSize: wrap},
-								TextLabel{AssignTo: &p.hint, TextColor: red, MinSize: wrap},
-								ProgressBar{AssignTo: &p.bar, MaxValue: 100},
-								TextLabel{AssignTo: &p.saved, MinSize: wrap},
+					GroupBox{
+						Title:  t("sec_usb"),
+						Layout: VBox{},
+						Children: []Widget{
+							toolRow(&p.localBtn, t("t_local"), t("t_local_sub"), func() { p.flashLocal() }),
+							toolRow(&p.backupBtn, t("t_backup"), t("t_backup_sub"), func() { p.backup() }),
+							toolRow(&p.backupsBtn, t("t_backups"), t("t_backups_sub"), func() { runBackups(p.a) }),
+							toolRow(&p.restoreBtn, t("t_restore"), t("t_restore_sub"), func() { p.restore() }),
+							Composite{Layout: VBox{Margins: Margins{Left: 220}}, Children: []Widget{
+								TextLabel{Text: "1. " + t("restore_step1") + "\r\n2. " + t("restore_step2"), MinSize: wrap},
+								CheckBox{AssignTo: &p.fullBackup, Text: t("r_full"), Checked: true, Alignment: AlignHNearVCenter},
+								TextLabel{Text: t("r_safety"), TextColor: grey, MinSize: wrap},
+								Label{Text: t("r_fw") + "：" + factory.Version, TextColor: grey},
 								Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
-									PushButton{AssignTo: &p.openBtn, Text: t("open_backup"), Visible: false, OnClicked: func() {
-										if dir, err := p.a.c.RevealPath("restore-session", ""); err == nil {
-											reveal(dir)
-										}
+									PushButton{AssignTo: &p.stopBtn, Text: t("restore_stop"), Enabled: false, OnClicked: func() {
+										p.a.showError(p.a.c.CancelRestore())
 									}},
 									HSpacer{},
 								}},
-								Label{Text: t("log"), TextColor: grey},
-								TextEdit{AssignTo: &p.logView, ReadOnly: true, VScroll: true, MinSize: Size{Height: 200}},
-							},
-						}, VSpacer{}},
+							}},
+						},
+					},
+					GroupBox{
+						Title:  t("sec_installer"),
+						Layout: VBox{},
+						Children: []Widget{
+							toolRow(&p.instBtn, t("t_installer"), t("t_installer_sub"), func() { p.installInstaller() }),
+							TextLabel{AssignTo: &p.instStatus, TextColor: grey, MinSize: wrap, Visible: false},
+							toolRow(&noBtn, t("t_installer_wifi"), t("t_installer_wifi_sub"), nil),
+						},
+					},
+					GroupBox{
+						Title:  t("sec_blufi"),
+						Layout: VBox{},
+						Children: []Widget{
+							toolRow(&noBtn, t("t_blufi"), t("t_blufi_sub"), nil),
+						},
+					},
+					GroupBox{
+						Title:  t("r_backup_dir"),
+						Layout: HBox{},
+						Children: []Widget{
+							LineEdit{AssignTo: &p.backupDir, ReadOnly: true},
+							PushButton{Text: t("change"), OnClicked: p.chooseBackupDir},
+							PushButton{Text: t("open_backup"), OnClicked: func() { reveal(p.a.c.Settings.Get().Backups()) }},
+						},
+					},
+					GroupBox{
+						Title:  t("driver_title"),
+						Layout: VBox{},
+						Children: []Widget{
+							TextLabel{AssignTo: &p.driverText, MinSize: wrap},
+							Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
+								PushButton{AssignTo: &p.driverBtn, Text: t("driver_install"), OnClicked: p.installDriver},
+								HSpacer{},
+							}},
+						},
 					},
 				},
 			},
-			VSpacer{},
+			Composite{
+				StretchFactor: 2,
+				Layout:        VBox{MarginsZero: true},
+				Children: []Widget{GroupBox{
+					Title:  t("status"),
+					Layout: VBox{},
+					Children: []Widget{
+						Label{AssignTo: &p.stage, Font: uiFont(12, true)},
+						TextLabel{AssignTo: &p.sub, MinSize: wrap},
+						TextLabel{AssignTo: &p.hint, TextColor: red, MinSize: wrap},
+						ProgressBar{AssignTo: &p.bar, MaxValue: 100},
+						TextLabel{AssignTo: &p.saved, MinSize: wrap},
+						Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
+							PushButton{AssignTo: &p.openBtn, Text: t("open_backup"), Visible: false, OnClicked: func() {
+								if dir, err := p.a.c.RevealPath("restore-session", ""); err == nil {
+									reveal(dir)
+								}
+							}},
+							HSpacer{},
+						}},
+						Label{Text: t("log"), TextColor: grey},
+						TextEdit{AssignTo: &p.logView, ReadOnly: true, VScroll: true, MinSize: Size{Height: 200}},
+					},
+				}, VSpacer{}},
+			},
 		},
 	}
 }
@@ -245,12 +281,14 @@ func (p *toolsPage) checkDriver() {
 
 func (p *toolsPage) refresh() {
 	p.checkDriver()
+	p.refreshInstaller()
 	setEnabled(p.driverBtn, !p.driverBusy)
 	c := p.a.c
 	st := c.Flash.Snapshot()
 	busy := st.Active || (c.Sync.Running() && c.Sync.Snapshot().Kind == "move")
-	setEnabled(p.backupBtn, !busy)
-	setEnabled(p.restoreBtn, !busy)
+	for _, b := range []*walk.PushButton{p.backupBtn, p.restoreBtn, p.backBtn, p.localBtn, p.instBtn} {
+		setEnabled(b, !busy)
+	}
 	setEnabled(p.stopBtn, st.Active && st.Kind != "flash" && !st.Cancelling && cancellable(st.Stage))
 
 	mine := st.Kind == "restore" || st.Kind == "backup"

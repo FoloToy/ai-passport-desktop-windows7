@@ -22,6 +22,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/FoloToy/ai-passport-desktop/pkg/account"
 	"github.com/FoloToy/ai-passport-desktop/pkg/core"
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
@@ -42,20 +43,34 @@ type app struct {
 	mw   *walk.MainWindow
 	tabs *walk.TabWidget
 
+	device   *devicePage
 	plays    *playsPage
 	tools    *toolsPage
-	settings *settingsPage
+	me       *mePage
+	settings *settingsPage // shown on the Me tab
 	status   *walk.StatusBarItem
 	version  *walk.StatusBarItem
 
 	// flashDlg is non-nil while the install dialog is open.
 	flashDlg *flashDialog
-	done     chan struct{}
+	// dialog is the other dialog that is open (sign-in, comments, lists, backups);
+	// capture saves it by its own handle.
+	dialog *walk.Dialog
+	done   chan struct{}
 
 	// driverMissing is true while a plugged-in AI Passport has no serial driver
 	// (Windows 7/8). driverAsked keeps the install prompt to once per run.
 	driverMissing bool
 	driverAsked   bool
+
+	// The community account (nil when the session file cannot be used).
+	acct        *account.Client
+	user        *user
+	userKnown   bool
+	unread      int
+	unreadAsked bool
+	eng         map[string]*engagement
+	loginIso    string
 }
 
 // form is the window message boxes belong to: the install dialog when it is open.
@@ -67,9 +82,13 @@ func (a *app) form() walk.Form {
 }
 
 // Run shows the main window and returns when it is closed.
-func Run(c *core.Core) error {
-	a := &app{c: c, plays: &playsPage{}, tools: &toolsPage{}, settings: &settingsPage{}, done: make(chan struct{})}
-	a.plays.a, a.tools.a, a.settings.a = a, a, a
+// acct may be nil; the account features then report a network error.
+func Run(c *core.Core, acct *account.Client) error {
+	a := &app{c: c, acct: acct, device: &devicePage{}, plays: &playsPage{}, tools: &toolsPage{}, me: &mePage{}, settings: &settingsPage{},
+		eng: map[string]*engagement{}, done: make(chan struct{})}
+	a.device.a, a.plays.a, a.tools.a, a.me.a, a.settings.a = a, a, a, a, a
+	// Tab order as in the Android app: 设备 / 玩法 / 工具 / 我的.
+	a.device.tab, a.plays.tab, a.tools.tab, a.me.tab = 0, 1, 2, 3
 
 	err := MainWindow{
 		AssignTo: &a.mw,
@@ -82,9 +101,10 @@ func Run(c *core.Core) error {
 			TabWidget{
 				AssignTo: &a.tabs,
 				Pages: []TabPage{
+					a.device.page(),
 					a.plays.page(),
 					a.tools.page(),
-					a.settings.page(),
+					a.me.page(),
 				},
 			},
 		},
@@ -114,7 +134,12 @@ func Run(c *core.Core) error {
 	a.plays.init()
 	a.tools.init()
 	a.settings.init()
+	a.device.init()
+	a.me.init()
+	// Open on 玩法, like the desktop app.
+	_ = a.tabs.SetCurrentIndex(a.plays.tab)
 	a.refresh()
+	a.refreshMe()
 	go a.poll()
 	if dir := os.Getenv("AIPP_CAPTURE"); dir != "" {
 		go a.capture(dir)
@@ -141,6 +166,7 @@ func (a *app) poll() {
 }
 
 func (a *app) refresh() {
+	a.device.refresh()
 	a.plays.refresh()
 	a.tools.refresh()
 	a.settings.refresh()
@@ -158,6 +184,20 @@ func (a *app) refresh() {
 		}
 		setText(a.status, s)
 	}
+}
+
+// goTab switches to a tab.
+func (a *app) goTab(i int) { _ = a.tabs.SetCurrentIndex(i) }
+
+// showPlay opens a play on the Plays tab.
+func (a *app) showPlay(slug string) {
+	a.goTab(a.plays.tab)
+	a.plays.selectSlug(slug)
+}
+
+// showText shows a message from the community site.
+func (a *app) showText(msg string) {
+	walk.MsgBox(a.form(), t("app_title"), msg, walk.MsgBoxIconWarning)
 }
 
 func (a *app) showError(err error) {
@@ -233,8 +273,14 @@ func setText(w texter, s string) {
 	}
 }
 
+// setVisible reads the control's own WS_VISIBLE style: walk's Visible() is
+// false for every control on a tab that is not shown, which would skip changes.
 func setVisible(w walk.Widget, v bool) {
-	if w != nil && w.Visible() != v {
+	if w == nil {
+		return
+	}
+	shown := win.GetWindowLong(w.Handle(), win.GWL_STYLE)&win.WS_VISIBLE != 0
+	if shown != v {
 		w.SetVisible(v)
 	}
 }
@@ -323,9 +369,9 @@ func (a *app) capture(dir string) {
 		time.Sleep(1500 * time.Millisecond)
 		shot(fmt.Sprintf("tab%d", i))
 	}
-	// The settings tab again, with the hidden advanced group shown (five clicks).
+	// The Me tab again, with the hidden batch download shown (five clicks).
 	a.mw.Synchronize(func() {
-		_ = a.tabs.SetCurrentIndex(a.tabs.Pages().Len() - 1)
+		_ = a.tabs.SetCurrentIndex(a.me.tab)
 		for range 5 {
 			a.settings.versionTap()
 		}
@@ -334,8 +380,28 @@ func (a *app) capture(dir string) {
 	shot("advanced")
 	// The install dialog for the first downloaded play; it is closed without
 	// starting anything.
+	// The sign-in dialog, My backups and the comments of the first play.
+	for _, d := range []struct {
+		name string
+		open func()
+	}{
+		{"login", func() { runLoginDialog(a) }},
+		{"backups", func() { runBackups(a) }},
+	} {
+		a.mw.Synchronize(func() { go a.mw.Synchronize(d.open) })
+		time.Sleep(3 * time.Second)
+		a.shotDialog(dir, d.name)
+	}
 	a.mw.Synchronize(func() {
-		_ = a.tabs.SetCurrentIndex(0)
+		_ = a.tabs.SetCurrentIndex(a.plays.tab)
+		if pl := a.plays.current(); pl != nil {
+			go a.mw.Synchronize(func() { runComments(a, pl) })
+		}
+	})
+	time.Sleep(5 * time.Second)
+	a.shotDialog(dir, "comments")
+	a.mw.Synchronize(func() {
+		_ = a.tabs.SetCurrentIndex(a.plays.tab)
 		a.plays.onlyReady.SetChecked(true)
 		a.plays.apply()
 		if pl := a.plays.current(); pl == nil && len(a.plays.model.rows) > 0 {
@@ -361,6 +427,37 @@ func (a *app) capture(dir string) {
 	<-done
 	time.Sleep(time.Second)
 	a.mw.Synchronize(func() { a.mw.Close() })
+}
+
+// runDialog shows a dialog of this program and keeps it in a.dialog while it is open.
+func (a *app) runDialog(d *walk.Dialog) {
+	a.dialog = d
+	d.Run()
+	if a.dialog == d {
+		a.dialog = nil
+	}
+}
+
+// shotDialog saves the dialog that capture opened (only this program's own
+// dialog, found by its handle) and closes it.
+func (a *app) shotDialog(dir, name string) {
+	done := make(chan struct{})
+	a.mw.Synchronize(func() {
+		defer close(done)
+		d := a.dialog
+		if d == nil {
+			return
+		}
+		if img := printWindow(d.Handle()); img != nil {
+			if f, err := os.Create(filepath.Join(dir, name+".png")); err == nil {
+				_ = png.Encode(f, img)
+				f.Close()
+			}
+		}
+		d.Cancel()
+	})
+	<-done
+	time.Sleep(time.Second)
 }
 
 var procPrintWindow = syscall.NewLazyDLL("user32.dll").NewProc("PrintWindow")

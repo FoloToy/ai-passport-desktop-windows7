@@ -71,7 +71,8 @@ type filter struct {
 }
 
 type playsPage struct {
-	a *app
+	a   *app
+	tab int
 
 	// Toolbar and sync status.
 	search    *walk.LineEdit
@@ -111,13 +112,19 @@ type playsPage struct {
 	usage       *walk.TextEdit
 	changelog   *walk.TextEdit
 	fetchStatus *walk.Label
+
+	// Likes, favorites and comments, live from the community site.
+	heartBtn   *walk.PushButton
+	favBtn     *walk.PushButton
+	commentBtn *walk.PushButton
+	viewTimer  *time.Timer
 }
 
 func (p *playsPage) page() TabPage {
 	p.model = &playModel{ready: map[string]bool{}, cats: map[string]string{}}
 	bold := uiFont(12, true)
 	return TabPage{
-		Title:  t("nav_library"),
+		Title:  t("nav_plays"),
 		Layout: VBox{},
 		Children: []Widget{
 			Composite{
@@ -204,6 +211,27 @@ func (p *playsPage) page() TabPage {
 									ImageView{AssignTo: &p.cover, Mode: ImageViewModeZoom, MinSize: Size{Width: 320, Height: 180}, MaxSize: Size{Height: 180}},
 									Label{AssignTo: &p.title, Font: bold},
 									TextLabel{AssignTo: &p.meta, TextColor: grey, MinSize: Size{Width: 200}},
+									Composite{
+										Layout: HBox{MarginsZero: true},
+										Children: []Widget{
+											PushButton{AssignTo: &p.heartBtn, OnClicked: func() {
+												if pl := p.current(); pl != nil {
+													p.a.toggleHeart(pl)
+												}
+											}},
+											PushButton{AssignTo: &p.favBtn, OnClicked: func() {
+												if pl := p.current(); pl != nil {
+													p.a.toggleFavorite(pl)
+												}
+											}},
+											PushButton{AssignTo: &p.commentBtn, OnClicked: func() {
+												if pl := p.current(); pl != nil {
+													runComments(p.a, pl)
+												}
+											}},
+											HSpacer{},
+										},
+									},
 									Label{AssignTo: &p.fwInfo},
 									Composite{
 										Layout: HBox{MarginsZero: true},
@@ -373,6 +401,7 @@ func (p *playsPage) show(pl *library.Play) {
 	changed := pl.Slug != p.selected
 	p.selected = pl.Slug
 	if changed {
+		p.viewed(pl)
 		var bmp *walk.Bitmap
 		lib := p.a.c.Library()
 		for _, rel := range []string{pl.Cover, pl.Thumb} {
@@ -413,8 +442,9 @@ func (p *playsPage) show(pl *library.Play) {
 	} else if d := day(pl.PublishedAt); d != "" {
 		meta = append(meta, t("published_at")+" "+d)
 	}
-	meta = append(meta, t("downloads")+" "+strconv.Itoa(pl.Downloads), t("hearts")+" "+strconv.Itoa(pl.Hearts))
+	meta = append(meta, t("downloads")+" "+strconv.Itoa(pl.Downloads))
 	setText(p.meta, plain(strings.Join(meta, "  ·  ")))
+	p.refreshEngagement()
 	p.refreshFirmware(pl)
 }
 
@@ -588,4 +618,66 @@ func syncLine(st syncer.State) (string, string) {
 		info = append(info, i18n.Throttled(wait(st.ThrottledUntil)))
 	}
 	return t("sync_phase") + phase, strings.Join(info, "    ")
+}
+
+// viewed counts a view once a play has stayed selected for a moment (so that
+// scrolling through the list with the arrow keys does not count every row) and
+// loads its live likes and favorites.
+func (p *playsPage) viewed(pl *library.Play) {
+	if p.viewTimer != nil {
+		p.viewTimer.Stop()
+	}
+	slug := pl.Slug
+	p.viewTimer = time.AfterFunc(800*time.Millisecond, func() {
+		p.a.mw.Synchronize(func() {
+			if cur := p.current(); cur != nil && cur.Slug == slug {
+				p.a.recordView(cur)
+				p.a.loadEngagement(cur)
+			}
+		})
+	})
+}
+
+// refreshEngagement shows the like, favorite and comment counts of the selected play.
+func (p *playsPage) refreshEngagement() {
+	pl := p.current()
+	if pl == nil || p.heartBtn == nil {
+		return
+	}
+	e := p.a.engagementOf(pl)
+	heart, fav := "♡ "+t("like"), "☆ "+t("fav")
+	if e.liked {
+		heart = "♥ " + t("liked")
+	}
+	if e.saved {
+		fav = "★ " + t("faved")
+	}
+	setText(p.heartBtn, heart+" "+strconv.Itoa(e.hearts))
+	setText(p.favBtn, fav+" "+strconv.Itoa(e.favorites))
+	setText(p.commentBtn, t("tab_comments")+" "+strconv.Itoa(pl.Comments))
+}
+
+// reloadEngagement fetches the selected play's counts again (after signing in).
+func (p *playsPage) reloadEngagement() {
+	if pl := p.current(); pl != nil {
+		p.a.loadEngagement(pl)
+	}
+	p.refreshEngagement()
+}
+
+// selectSlug selects a play in the table, clearing filters that hide it.
+func (p *playsPage) selectSlug(slug string) {
+	for pass := 0; pass < 2; pass++ {
+		for i, r := range p.model.rows {
+			if r.Slug == slug {
+				_ = p.table.SetCurrentIndex(i)
+				p.table.EnsureItemVisible(i)
+				return
+			}
+		}
+		setText(p.search, "")
+		_ = p.category.SetCurrentIndex(0)
+		p.onlyReady.SetChecked(false)
+		p.apply()
+	}
 }

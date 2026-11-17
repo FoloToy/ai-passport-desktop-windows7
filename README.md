@@ -20,7 +20,8 @@ Windows 10/11 和 macOS 请用 [ai-passport-desktop](https://github.com/FoloToy/
 1. 把 ZIP 完整解压（不要在压缩包里直接运行），双击 `AIPassportPlays.exe`。不需要装浏览器、.NET 或其他运行库。
 2. 第一次打开时选择玩法存储目录，点"开始更新"。
 3. 插上 AI Passport。Windows 7/8 第一次要装串口驱动：驱动已经在程序里，程序发现设备缺驱动时会主动询问是否安装（见下一节）。
-4. "玩法社区"页选择玩法 →"刷入设备"→ 选择设备 →"开始刷入"。
+4. "玩法"页选择玩法 →"刷入设备"→ 选择设备 → 勾选"我知道设备上原有的玩法和数据会被覆盖"→"开始刷入"。
+5. 在"我的"页登录（手机号或邮箱验证码，和网站、安卓 App 同一个账号）后，可以点赞、收藏、评论，查看消息和安装历史。
 
 和旧的 Chrome 版 Windows 7 程序、以及桌面版用同一个设置目录（`%APPDATA%\FoloToy\AI Passport Plays`），已经下载的玩法库可以直接继续用。同一时间只能运行其中一个程序。
 
@@ -35,7 +36,7 @@ AI Passport 的 USB 口对电脑来说是一个设备、两个接口：
 
 ### 在程序里安装（推荐）
 
-插上缺驱动的 AI Passport 后，程序会弹窗询问"现在安装吗？"（每次运行问一次，在哪个页面都会弹）；点"是"即开始安装。也可以随时在"设备工具"页 →"USB 串口驱动"→ 点"安装驱动"。刷机对话框和备份、恢复出厂找不到设备时，如果是缺驱动，也会直接说明并给出"安装驱动"按钮。
+插上缺驱动的 AI Passport 后，程序会弹窗询问"现在安装吗？"（每次运行问一次，在哪个页面都会弹）；点"是"即开始安装。也可以随时在"工具"页 →"USB 串口驱动"→ 点"安装驱动"。刷机对话框和备份、恢复出厂找不到设备时，如果是缺驱动，也会直接说明并给出"安装驱动"按钮。
 
 安装过程：UAC 窗口点"是"→ 如果提示"Windows 无法验证此驱动程序软件的发布者"，选"始终安装此驱动程序软件"→ 装好后重新插拔设备。
 
@@ -77,7 +78,7 @@ AI Passport 的 USB 口对电脑来说是一个设备、两个接口：
 | 目录 | 内容 |
 | --- | --- |
 | `main.go` | 启动、命令行参数（`-self-test -state-dir -origin`）、单实例 |
-| `internal/ui/` | 窗口：玩法社区（`plays.go`）、刷入对话框（`flash.go`）、设备工具（`tools.go`）、设置（`settings.go`） |
+| `internal/ui/` | 窗口：设备（`device.go`）、玩法（`plays.go`、评论 `comments.go`）、工具（`tools.go`、我的备份 `backups.go`）、我的（`me.go`、设置 `settings.go`）、登录和社区接口（`account.go`）、刷入对话框（`flash.go`） |
 | `internal/i18n/` | 中英文案；`web.json` 从桌面版 `frontend/app.js` 导出 |
 | `internal/driver/` | Windows 7/8 串口驱动检测和安装 |
 | `drivers/windows7/` | Espressif 的 JTAG 驱动 zip |

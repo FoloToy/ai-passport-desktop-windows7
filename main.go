@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/FoloToy/ai-passport-desktop/pkg/account"
 	"github.com/FoloToy/ai-passport-desktop/pkg/core"
 	"github.com/FoloToy/ai-passport-desktop/pkg/device"
 	"github.com/FoloToy/ai-passport-desktop/pkg/esp"
@@ -69,7 +70,12 @@ func main() {
 	sync := syncer.New(syncer.NewClient(*origin, version))
 	c := core.New(version, dir, store, sync, flasher.New(runner), runner)
 	c.CheckUpdatesInBackground()
-	if err := ui.Run(c); err != nil {
+	// The community account: the same session file and allowlist as the desktop app.
+	acct, err := account.New(*origin, "AIPassportPlays/"+version+" (windows7)", dir)
+	if err != nil {
+		acct = nil
+	}
+	if err := ui.Run(c, acct); err != nil {
 		ui.Notice(err.Error())
 		os.Exit(1)
 	}

@@ -3,10 +3,12 @@
 package ui
 
 import (
+	"sort"
 	"strconv"
 	"time"
 
 	"github.com/FoloToy/ai-passport-desktop/pkg/factory"
+	"github.com/FoloToy/ai-passport-desktop/pkg/library"
 	"github.com/FoloToy/ai-passport-desktop/pkg/syncer"
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
@@ -26,93 +28,93 @@ type settingsPage struct {
 	langNote  *walk.Label
 	langReady bool
 
-	// Hidden "advanced" group, shown after five clicks on the version line.
+	// Hidden batch download for show booths, shown after five clicks on the
+	// version line in About.
 	advanced  *walk.GroupBox
-	prefetch  *walk.CheckBox
+	batchText *walk.Label
+	batchBtn  *walk.PushButton
 	taps      []time.Time
-	prefReady bool
 
 	usageFor  string
 	usageNext time.Time
 	usageDone chan string
 }
 
-func (p *settingsPage) page() TabPage {
+// widgets are the settings groups; they sit on the right half of 我的, as the
+// settings are part of the Me tab in the Android app.
+func (p *settingsPage) widgets() []Widget {
 	origin := p.a.c.Sync.Client.Origin
-	return TabPage{
-		Title:  t("nav_settings"),
-		Layout: VBox{},
-		Children: []Widget{
-			GroupBox{
-				Title:  t("s_library"),
-				Layout: VBox{},
-				Children: []Widget{
-					Label{Text: t("s_library_sub"), TextColor: grey},
-					Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
-						LineEdit{AssignTo: &p.dir, ReadOnly: true},
-						PushButton{Text: t("change_dir"), OnClicked: p.changeDir},
-						PushButton{Text: t("reveal_win"), OnClicked: func() {
-							if dir, err := p.a.c.RevealPath("library", ""); err == nil {
-								reveal(dir)
-							}
-						}},
+	return []Widget{
+		GroupBox{
+			Title:  t("s_library"),
+			Layout: VBox{},
+			Children: []Widget{
+				Label{Text: t("s_library_sub"), TextColor: grey},
+				Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
+					LineEdit{AssignTo: &p.dir, ReadOnly: true},
+					PushButton{Text: t("change_dir"), OnClicked: p.changeDir},
+					PushButton{Text: t("reveal_win"), OnClicked: func() {
+						if dir, err := p.a.c.RevealPath("library", ""); err == nil {
+							reveal(dir)
+						}
 					}},
-					Label{AssignTo: &p.usage, TextColor: grey},
-				},
+				}},
+				Label{AssignTo: &p.usage, TextColor: grey},
 			},
-			GroupBox{
-				Title:  t("s_data"),
-				Layout: VBox{},
-				Children: []Widget{
-					Label{AssignTo: &p.data},
-					Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
-						PushButton{AssignTo: &p.checkBtn, Text: t("check_update"), OnClicked: p.a.c.CheckUpdatesInBackground},
-						Label{AssignTo: &p.update},
-						HSpacer{},
-					}},
-				},
-			},
-			GroupBox{
-				Title:  t("s_language"),
-				Layout: HBox{},
-				Children: []Widget{
-					ComboBox{AssignTo: &p.lang, Model: []string{t("lang_auto"), t("lang_zh"), t("lang_en")}, OnCurrentIndexChanged: p.changeLang},
-					Label{AssignTo: &p.langNote, Text: t("lang_restart"), TextColor: grey, Visible: false},
-					HSpacer{},
-				},
-			},
-			GroupBox{
-				AssignTo:  &p.advanced,
-				Title:     t("s_advanced"),
-				Layout:    VBox{},
-				Alignment: AlignHNearVNear,
-				Visible:   false,
-				Children: []Widget{
-					Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
-						CheckBox{AssignTo: &p.prefetch, Text: t("s_prefetch"), OnCheckedChanged: p.changePrefetch},
-						HSpacer{},
-					}},
-					TextLabel{Text: t("s_prefetch_sub"), TextColor: grey, MinSize: Size{Width: 400}},
-				},
-			},
-			GroupBox{
-				Title:     t("s_about"),
-				Layout:    VBox{},
-				Alignment: AlignHNearVNear,
-				Children: []Widget{
-					Label{
-						Text:        t("app_title") + "（" + t("edition") + "）  " + t("version") + " " + p.a.c.Version,
-						OnMouseDown: func(x, y int, button walk.MouseButton) { p.versionTap() },
-					},
-					Label{Text: t("factory_fw") + "：" + factory.Version, TextColor: grey},
-					LinkLabel{
-						Text:            `<a href="` + origin + `/plays/">` + t("website") + `</a>    <a href="https://github.com/FoloToy/ai-passport-desktop-windows7">GitHub</a>`,
-						OnLinkActivated: func(link *walk.LinkLabelLink) { openURL(link.URL()) },
-					},
-				},
-			},
-			VSpacer{},
 		},
+		GroupBox{
+			Title:  t("s_data"),
+			Layout: VBox{},
+			Children: []Widget{
+				Label{AssignTo: &p.data},
+				Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
+					PushButton{AssignTo: &p.checkBtn, Text: t("check_update"), OnClicked: p.a.c.CheckUpdatesInBackground},
+					Label{AssignTo: &p.update},
+					HSpacer{},
+				}},
+			},
+		},
+		GroupBox{
+			Title:  t("s_language"),
+			Layout: HBox{},
+			Children: []Widget{
+				ComboBox{AssignTo: &p.lang, Model: []string{t("lang_auto"), t("lang_zh"), t("lang_en")}, OnCurrentIndexChanged: p.changeLang},
+				Label{AssignTo: &p.langNote, Text: t("lang_restart"), TextColor: grey, Visible: false},
+				HSpacer{},
+			},
+		},
+		GroupBox{
+			Title:     t("s_about"),
+			Layout:    VBox{},
+			Alignment: AlignHNearVNear,
+			Children: []Widget{
+				Label{
+					Text:        t("app_title") + "（" + t("edition") + "）  " + t("version") + " " + p.a.c.Version,
+					OnMouseDown: func(x, y int, button walk.MouseButton) { p.versionTap() },
+				},
+				Label{Text: t("factory_fw") + "：" + factory.Version, TextColor: grey},
+				LinkLabel{
+					Text:            `<a href="` + origin + `/plays/">` + t("website") + `</a>    <a href="https://github.com/FoloToy/ai-passport-desktop-windows7">GitHub</a>`,
+					OnLinkActivated: func(link *walk.LinkLabelLink) { openURL(link.URL()) },
+				},
+			},
+		},
+		GroupBox{
+			AssignTo:  &p.advanced,
+			Title:     t("batch_title"),
+			Layout:    VBox{},
+			Alignment: AlignHNearVNear,
+			Visible:   false,
+			Children: []Widget{
+				TextLabel{Text: i18n.Tf("batch_lead_n", batchSize), MinSize: Size{Width: 300}},
+				Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
+					PushButton{AssignTo: &p.batchBtn, Text: t("batch_start"), OnClicked: p.toggleBatch},
+					Label{AssignTo: &p.batchText, TextColor: grey},
+					HSpacer{},
+				}},
+			},
+		},
+		VSpacer{},
 	}
 }
 
@@ -128,13 +130,9 @@ func (p *settingsPage) init() {
 	}
 	setVisible(p.langNote, false)
 	p.langReady = true
-	on := p.a.c.Settings.Get().PrefetchFirmware
-	p.prefetch.SetChecked(on)
-	setVisible(p.advanced, on) // keep it visible while the setting is on
-	p.prefReady = true
 }
 
-// versionTap shows or hides the advanced group after five clicks within three seconds.
+// versionTap shows or hides the batch download after five clicks within three seconds.
 func (p *settingsPage) versionTap() {
 	now := time.Now()
 	taps := p.taps[:0]
@@ -148,14 +146,109 @@ func (p *settingsPage) versionTap() {
 		return
 	}
 	p.taps = nil
-	setVisible(p.advanced, !p.advanced.Visible())
+	on := !p.advanced.Visible() || p.a.c.Sync.Batch().Running
+	setVisible(p.advanced, on)
+	if on {
+		setText(p.a.status, t("hidden_on"))
+	} else {
+		setText(p.a.status, t("hidden_off"))
+	}
 }
 
-func (p *settingsPage) changePrefetch() {
-	if !p.prefReady {
+// batchSize is how many plays the booth download takes: the first screen of the
+// library, as in the desktop app.
+const batchSize = 16
+
+// firstScreen is the first screen of the library: the recommended plays (filled
+// up from the must-play topic, at most 12), then the newest plays.
+func firstScreen(idx *library.Index) []string {
+	if idx == nil {
+		return nil
+	}
+	byID := map[int]*library.Play{}
+	for i := range idx.Plays {
+		byID[idx.Plays[i].ID] = &idx.Plays[i]
+	}
+	var featured []*library.Play
+	seen := map[*library.Play]bool{}
+	add := func(pl *library.Play) {
+		if pl != nil && !pl.Removed && !seen[pl] {
+			seen[pl] = true
+			featured = append(featured, pl)
+		}
+	}
+	for _, id := range idx.Recommendations {
+		add(byID[id])
+	}
+	if len(featured) < 4 {
+		for _, tp := range idx.Topics {
+			if tp.Key == "must-play" {
+				for _, id := range tp.IDs {
+					add(byID[id])
+				}
+			}
+		}
+	}
+	if len(featured) > 12 {
+		featured = featured[:12]
+	}
+	newest := make([]*library.Play, 0, len(idx.Plays))
+	for i := range idx.Plays {
+		if !idx.Plays[i].Removed {
+			newest = append(newest, &idx.Plays[i])
+		}
+	}
+	sort.SliceStable(newest, func(i, j int) bool { return newest[i].PublishedAt > newest[j].PublishedAt })
+	var out []string
+	taken := map[string]bool{}
+	for _, pl := range append(featured, newest...) {
+		if len(out) >= batchSize {
+			break
+		}
+		if !pl.Removed && (pl.Ready || pl.Downloadable) && !taken[pl.Slug] {
+			taken[pl.Slug] = true
+			out = append(out, pl.Slug)
+		}
+	}
+	return out
+}
+
+func (p *settingsPage) toggleBatch() {
+	c := p.a.c
+	if c.Sync.Batch().Running {
+		c.Sync.CancelBatch()
 		return
 	}
-	p.a.showError(p.a.c.SetPrefetchFirmware(p.prefetch.Checked()))
+	idx, _, _ := c.Index()
+	slugs := firstScreen(idx)
+	if len(slugs) == 0 {
+		walk.MsgBox(p.a.mw, t("batch_title"), t("batch_none"), walk.MsgBoxIconWarning)
+		return
+	}
+	p.a.showError(c.StartBatch(slugs))
+}
+
+func (p *settingsPage) refreshBatch() {
+	b := p.a.c.Sync.Batch()
+	if b.Running {
+		setVisible(p.advanced, true)
+		setText(p.batchBtn, t("batch_stop"))
+	} else {
+		setText(p.batchBtn, t("batch_start"))
+	}
+	text := ""
+	switch {
+	case b.Running && !b.ThrottledUntil.IsZero() && time.Until(b.ThrottledUntil) > 0:
+		text = i18n.Tf("batch_running_n", b.Done, b.Total) + "    " + i18n.Tf("batch_wait_n", wait(b.ThrottledUntil))
+	case b.Running:
+		text = i18n.Tf("batch_running_n", b.Done, b.Total)
+	case b.Total > 0:
+		text = i18n.Tf("batch_done_n", b.Done, b.Total)
+		if b.Failed > 0 {
+			text += i18n.Tf("batch_failed_n", b.Failed)
+		}
+	}
+	setText(p.batchText, text)
 }
 
 func (p *settingsPage) changeLang() {
@@ -211,6 +304,7 @@ func yesNo(yes bool) string {
 }
 
 func (p *settingsPage) refresh() {
+	p.refreshBatch()
 	c := p.a.c
 	info := c.LibraryInfo()
 	setText(p.dir, info.Dir)
