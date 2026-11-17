@@ -27,7 +27,7 @@ import (
 	"github.com/FoloToy/ai-passport-desktop-windows7/internal/ui"
 )
 
-var version = "0.1.2-dev"
+var version = "0.2.0-dev"
 
 func main() {
 	selfTest := flag.Bool("self-test", false, "Check the bundled flasher stub, factory firmware and driver, print JSON and exit")
