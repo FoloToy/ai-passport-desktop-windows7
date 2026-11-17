@@ -3,7 +3,7 @@ module github.com/FoloToy/ai-passport-desktop-windows7
 go 1.26.0
 
 require (
-	github.com/FoloToy/ai-passport-desktop v0.4.2-0.20261114120629-de3e558383be
+	github.com/FoloToy/ai-passport-desktop v0.6.0
 	github.com/lxn/walk v0.0.0-20210112085537-c389da54e794
 	github.com/lxn/win v0.0.0-20210218163916-a377121e959e
 	golang.org/x/image v0.48.0

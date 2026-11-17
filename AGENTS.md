@@ -85,6 +85,7 @@ go get github.com/FoloToy/ai-passport-desktop@<commit 或 tag> && go mod tidy
 ### 社区接口
 
 - 固件下载接口按 IP 限流（20–30 次后返回 429，封 30 分钟以上）。测试时不要反复全量下载。
+- 所以“更新玩法库”默认只下载玩法信息和图片，固件在第一次刷入时按需下载（详情里的“下载固件”）并保存。全量下载固件是隐藏设置（`settings.PrefetchFirmware`）：在设置页的版本号上 3 秒内连点 5 次显示“高级”，默认关闭。
 
 ### Git
 

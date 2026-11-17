@@ -26,6 +26,12 @@ type settingsPage struct {
 	langNote  *walk.Label
 	langReady bool
 
+	// Hidden "advanced" group, shown after five clicks on the version line.
+	advanced  *walk.GroupBox
+	prefetch  *walk.CheckBox
+	taps      []time.Time
+	prefReady bool
+
 	usageFor  string
 	usageNext time.Time
 	usageDone chan string
@@ -76,11 +82,28 @@ func (p *settingsPage) page() TabPage {
 				},
 			},
 			GroupBox{
+				AssignTo:  &p.advanced,
+				Title:     t("s_advanced"),
+				Layout:    VBox{},
+				Alignment: AlignHNearVNear,
+				Visible:   false,
+				Children: []Widget{
+					Composite{Layout: HBox{MarginsZero: true}, Children: []Widget{
+						CheckBox{AssignTo: &p.prefetch, Text: t("s_prefetch"), OnCheckedChanged: p.changePrefetch},
+						HSpacer{},
+					}},
+					TextLabel{Text: t("s_prefetch_sub"), TextColor: grey, MinSize: Size{Width: 400}},
+				},
+			},
+			GroupBox{
 				Title:     t("s_about"),
 				Layout:    VBox{},
 				Alignment: AlignHNearVNear,
 				Children: []Widget{
-					Label{Text: t("app_title") + "（" + t("edition") + "）  " + t("version") + " " + p.a.c.Version},
+					Label{
+						Text:        t("app_title") + "（" + t("edition") + "）  " + t("version") + " " + p.a.c.Version,
+						OnMouseDown: func(x, y int, button walk.MouseButton) { p.versionTap() },
+					},
 					Label{Text: t("factory_fw") + "：" + factory.Version, TextColor: grey},
 					LinkLabel{
 						Text:            `<a href="` + origin + `/plays/">` + t("website") + `</a>    <a href="https://github.com/FoloToy/ai-passport-desktop-windows7">GitHub</a>`,
@@ -105,6 +128,34 @@ func (p *settingsPage) init() {
 	}
 	setVisible(p.langNote, false)
 	p.langReady = true
+	on := p.a.c.Settings.Get().PrefetchFirmware
+	p.prefetch.SetChecked(on)
+	setVisible(p.advanced, on) // keep it visible while the setting is on
+	p.prefReady = true
+}
+
+// versionTap shows or hides the advanced group after five clicks within three seconds.
+func (p *settingsPage) versionTap() {
+	now := time.Now()
+	taps := p.taps[:0]
+	for _, at := range p.taps {
+		if now.Sub(at) < 3*time.Second {
+			taps = append(taps, at)
+		}
+	}
+	p.taps = append(taps, now)
+	if len(p.taps) < 5 {
+		return
+	}
+	p.taps = nil
+	setVisible(p.advanced, !p.advanced.Visible())
+}
+
+func (p *settingsPage) changePrefetch() {
+	if !p.prefReady {
+		return
+	}
+	p.a.showError(p.a.c.SetPrefetchFirmware(p.prefetch.Checked()))
 }
 
 func (p *settingsPage) changeLang() {

@@ -1,6 +1,6 @@
 # AI Passport 玩法社区 · Windows 7 版
 
-给 **Windows 7 / 8 / 8.1** 用的原生桌面客户端：把 [AI Passport 玩法社区](https://ai-passport.folotoy.cn/plays/) 的全部玩法下载到电脑上，离线浏览，并通过 USB 把玩法刷入 AI Passport（ESP32-C3）；还能备份固件、恢复出厂固件、安装串口驱动。
+给 **Windows 7 / 8 / 8.1** 用的原生桌面客户端：把 [AI Passport 玩法社区](https://ai-passport.folotoy.cn/plays/) 的全部玩法信息下载到电脑上，离线浏览，并通过 USB 把玩法刷入 AI Passport（ESP32-C3，固件在第一次刷入时下载并保存）；还能备份固件、恢复出厂固件、安装串口驱动。
 
 A native client for Windows 7, 8 and 8.1: download every AI Passport play, browse offline, install plays over USB, back up or restore the firmware, and install the USB serial driver. No browser is needed.
 

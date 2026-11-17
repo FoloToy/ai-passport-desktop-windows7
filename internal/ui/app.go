@@ -323,6 +323,15 @@ func (a *app) capture(dir string) {
 		time.Sleep(1500 * time.Millisecond)
 		shot(fmt.Sprintf("tab%d", i))
 	}
+	// The settings tab again, with the hidden advanced group shown (five clicks).
+	a.mw.Synchronize(func() {
+		_ = a.tabs.SetCurrentIndex(a.tabs.Pages().Len() - 1)
+		for range 5 {
+			a.settings.versionTap()
+		}
+	})
+	time.Sleep(1500 * time.Millisecond)
+	shot("advanced")
 	// The install dialog for the first downloaded play; it is closed without
 	// starting anything.
 	a.mw.Synchronize(func() {
