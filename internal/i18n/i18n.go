@@ -31,7 +31,7 @@ func init() {
 
 // native is the text this client adds; each entry is {zh, en}.
 var native = map[string][2]string{
-	"app_title":            {"AI Passport 玩法社区", "AI Passport App Library"},
+	"app_title":            {"AI Passport", "AI Passport"},
 	"edition":              {"Windows 7 版", "Windows 7 edition"},
 	"col_name":             {"玩法", "App"},
 	"col_category":         {"分类", "Category"},

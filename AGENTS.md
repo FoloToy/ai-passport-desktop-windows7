@@ -4,7 +4,7 @@
 
 ## 项目是什么
 
-**AI Passport 玩法社区 · Windows 7 版**：给 Windows 7 / 8 / 8.1 用的原生 Win32 客户端。功能和桌面版一样：下载并离线浏览玩法、刷入玩法、备份固件、恢复出厂，另外能安装串口驱动。
+**AI Passport · Windows 7 版**（0.2 及以前叫「AI Passport 玩法社区」）：给 Windows 7 / 8 / 8.1 用的原生 Win32 客户端。功能和桌面版一样：下载并离线浏览玩法、刷入玩法、备份固件、恢复出厂，另外能安装串口驱动。
 
 - 仓库：`FoloToy/ai-passport-desktop-windows7`（公开，MIT），默认分支 `main`，PR 也提到 `main`。
 - 姊妹仓库：[FoloToy/ai-passport-desktop](https://github.com/FoloToy/ai-passport-desktop)（macOS、Windows 10/11）。**刷机、恢复出厂、同步、玩法库的代码都在那边的 `pkg/`**，这里通过 Go 模块引用，不要复制过来。

@@ -45,20 +45,20 @@ rm -rf "$dest"
 mkdir -p "$dest"
 for arch in amd64 386; do
   label=x64; [ "$arch" = 386 ] && label=x86
-  name="AI-Passport-Desktop-Windows7-$version-$label"
+  name="AI-Passport-$version-Windows7-$label"
   pkg="$dest/$name"
   mkdir -p "$pkg/drivers" "$pkg/ThirdParty/esp-flasher-stub"
   GOARCH=$arch "$go7" vet ./...
-  GOARCH=$arch "$go7" build -trimpath -ldflags "-s -w -H windowsgui -X main.version=$version" -o "$pkg/AIPassportPlays.exe" .
+  GOARCH=$arch "$go7" build -trimpath -ldflags "-s -w -H windowsgui -X main.version=$version" -o "$pkg/AI Passport.exe" .
   cp internal/driver/ai-passport-usb-serial.inf "$pkg/drivers/"
   cp drivers/windows7/AI-Passport-Win7-JTAG-driver-Espressif-2021-07-15.zip "$pkg/drivers/"
   cp LICENSE THIRD_PARTY.md "$pkg/ThirdParty/"
   cp "$desktop/pkg/esp/stub/LICENSE-APACHE" "$desktop/pkg/esp/stub/LICENSE-MIT" "$pkg/ThirdParty/esp-flasher-stub/"
   git rev-parse HEAD > "$pkg/source-commit.txt" 2>/dev/null || true
   sed 's/$/\r/' > "$pkg/START-HERE.txt" <<TXT
-AI Passport 玩法社区 ${version} / Windows 7、8、8.1 版（${label}）
+AI Passport ${version} / Windows 7、8、8.1 版（${label}）
 
-1. 把整个文件夹解压到电脑上（不要在压缩包里直接运行），双击 AIPassportPlays.exe。
+1. 把整个文件夹解压到电脑上（不要在压缩包里直接运行），双击 AI Passport.exe。
    不需要安装浏览器或其他软件。
 2. 第一次打开时选择玩法存储目录，点"开始更新"，把玩法下载到电脑上。
 3. 插上 AI Passport。Windows 7/8 第一次使用要装一次串口驱动（驱动已经包含在程序里）：
@@ -71,7 +71,7 @@ AI Passport 玩法社区 ${version} / Windows 7、8、8.1 版（${label}）
 32 位 Windows 用 x86 版，64 位用 x64 版（"计算机"右键 → 属性 → 系统类型）。
 本版本没有代码签名，杀毒软件可能误报。
 
-Native Windows 7/8/8.1 client. Extract the folder and run AIPassportPlays.exe; no browser
+Native Windows 7/8/8.1 client. Extract the folder and run "AI Passport.exe"; no browser
 is needed. The serial driver is built in: when you plug in an AI Passport that has no
 driver, the app offers to install it (or use "Install driver" on the Device tools page).
 TXT

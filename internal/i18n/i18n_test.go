@@ -32,7 +32,7 @@ func TestNativeTextsHaveBothLanguages(t *testing.T) {
 func TestFallbacks(t *testing.T) {
 	defer Set("zh")
 	Set("en")
-	if T("stop") != "Stop" || T("app_title") != "AI Passport App Library" {
+	if T("stop") != "Stop" || T("app_title") != "AI Passport" {
 		t.Fatal("English lookup failed")
 	}
 	if T("no-such-key") != "no-such-key" {

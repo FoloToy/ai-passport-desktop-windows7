@@ -1,4 +1,4 @@
-# AI Passport 玩法社区 · Windows 7 版
+# AI Passport · Windows 7 版
 
 给 **Windows 7 / 8 / 8.1** 用的原生桌面客户端：把 [AI Passport 玩法社区](https://ai-passport.folotoy.cn/plays/) 的全部玩法信息下载到电脑上，离线浏览，并通过 USB 把玩法刷入 AI Passport（ESP32-C3，固件在第一次刷入时下载并保存）；还能备份固件、恢复出厂固件、安装串口驱动。
 
@@ -12,18 +12,18 @@ Windows 10/11 和 macOS 请用 [ai-passport-desktop](https://github.com/FoloToy/
 
 | 系统 | 文件 |
 | --- | --- |
-| 64 位 Windows 7/8/8.1 | `AI-Passport-Desktop-Windows7-<版本>-x64.zip` |
-| 32 位 Windows 7/8/8.1 | `AI-Passport-Desktop-Windows7-<版本>-x86.zip` |
+| 64 位 Windows 7/8/8.1 | `AI-Passport-<版本>-Windows7-x64.zip` |
+| 32 位 Windows 7/8/8.1 | `AI-Passport-<版本>-Windows7-x86.zip` |
 
 不知道是 32 位还是 64 位：右键"计算机"→ 属性 → 系统类型。
 
-1. 把 ZIP 完整解压（不要在压缩包里直接运行），双击 `AIPassportPlays.exe`。不需要装浏览器、.NET 或其他运行库。
+1. 把 ZIP 完整解压（不要在压缩包里直接运行），双击 `AI Passport.exe`。不需要装浏览器、.NET 或其他运行库。
 2. 第一次打开时选择玩法存储目录，点"开始更新"。
 3. 插上 AI Passport。Windows 7/8 第一次要装串口驱动：驱动已经在程序里，程序发现设备缺驱动时会主动询问是否安装（见下一节）。
 4. "玩法"页选择玩法 →"刷入设备"→ 选择设备 → 勾选"我知道设备上原有的玩法和数据会被覆盖"→"开始刷入"。
 5. 在"我的"页登录（手机号或邮箱验证码，和网站、安卓 App 同一个账号）后，可以点赞、收藏、评论，查看消息和安装历史。
 
-和旧的 Chrome 版 Windows 7 程序、以及桌面版用同一个设置目录（`%APPDATA%\FoloToy\AI Passport Plays`），已经下载的玩法库可以直接继续用。同一时间只能运行其中一个程序。
+和旧的 Chrome 版 Windows 7 程序、以及桌面版用同一个设置目录（`%APPDATA%\FoloToy\AI Passport`），已经下载的玩法库可以直接继续用。同一时间只能运行其中一个程序。
 
 ## 串口驱动
 

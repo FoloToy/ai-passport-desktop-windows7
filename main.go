@@ -1,6 +1,6 @@
 //go:build windows
 
-// AI Passport 玩法社区 for Windows 7 / 8 / 8.1: a native Win32 client. Flashing,
+// AI Passport for Windows 7 / 8 / 8.1: a native Win32 client. Flashing,
 // factory restore, backups and the play library come from the shared packages of
 // github.com/FoloToy/ai-passport-desktop (pkg/core and below); this program adds the
 // window (internal/ui) and the USB serial driver installer (internal/driver).
@@ -10,7 +10,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/FoloToy/ai-passport-desktop/pkg/account"
 	"github.com/FoloToy/ai-passport-desktop/pkg/core"
@@ -27,7 +26,7 @@ import (
 	"github.com/FoloToy/ai-passport-desktop-windows7/internal/ui"
 )
 
-var version = "0.2.0-dev"
+var version = "0.3.0-dev"
 
 func main() {
 	selfTest := flag.Bool("self-test", false, "Check the bundled flasher stub, factory firmware and driver, print JSON and exit")
@@ -41,14 +40,15 @@ func main() {
 
 	dir := *stateDir
 	if dir == "" {
-		base, err := os.UserConfigDir()
-		if err != nil {
-			ui.Notice(err.Error())
+		// Same folder as the desktop app (%APPDATA%\FoloToy\AI Passport); the
+		// "AI Passport Plays" folder of earlier versions is moved there.
+		var err error
+		if dir, err = settings.StateDir(); err != nil {
+			if !ui.Activate() {
+				ui.Notice(err.Error())
+			}
 			os.Exit(1)
 		}
-		// Same folder as the desktop app and the old Chrome-based Windows 7
-		// edition, so an existing library and settings are kept.
-		dir = filepath.Join(base, "FoloToy", "AI Passport Plays")
 	}
 	store, err := settings.Open(dir)
 	if err != nil {
@@ -65,6 +65,7 @@ func main() {
 		return
 	}
 	defer unlock()
+	_ = store.MigrateLibrary()
 
 	runner := device.Runner{}
 	sync := syncer.New(syncer.NewClient(*origin, version))
